@@ -64,7 +64,7 @@ template <class F, class ...Args>
 auto ThreadPool::addTask(F&& f, Args&& ...args) -> std::future<typename std::result_of<F(Args...)>::type>
 {
     using return_type = typename std::result_of<F(Args...)>::type;
-    auto task = new std::packaged_task<return_type()>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+    std::shared_ptr<std::packaged_task<return_type()>>task(new std::packaged_task<return_type()>(std::bind(std::forward<F>(f), std::forward<Args>(args)...)));
     std::future<return_type> res = task->get_future();
 
     {
@@ -73,15 +73,7 @@ auto ThreadPool::addTask(F&& f, Args&& ...args) -> std::future<typename std::res
             throw std::runtime_error("the ThreadPool stopped");
         }
         tasks.emplace(
-                [task](){
-                    try {
-                        (*task)();
-                    }
-                    catch (...)
-                    {
-                        delete task;
-                    }
-                });
+                [task](){ (*task)(); });
     }
     conditionVariable.notify_one();
     return res;
